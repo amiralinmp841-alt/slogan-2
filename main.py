@@ -177,26 +177,32 @@ async def list_slogans(update,context):
     await update.message.reply_text(txt,parse_mode=ParseMode.MARKDOWN)
 
 # ================= GROUP =================
-async def slogan_listener(update,context):
-    text=update.message.text
+async def slogan_listener(update: Update, context):
+    text = update.message.text
     with sqlite3.connect(DB_PATH) as conn:
-        r=conn.execute("SELECT score FROM slogans WHERE text=?",(text,)).fetchone()
-        if not r: return
-        score=r[0]
-        uid=update.effective_user.id
-        cid=update.effective_chat.id
-        cur=conn.execute(
+        row = conn.execute("SELECT score FROM slogans WHERE text=?",
+                           (text,)).fetchone()
+        if not row:
+            return
+        score = row[0]
+        uid = update.effective_user.id
+        cid = update.effective_chat.id
+        cur = conn.execute(
             "SELECT score FROM user_scores WHERE user_id=? AND chat_id=?",
-            (uid,cid)).fetchone()
-        total=(cur[0] if cur else 0)+score
+            (uid, cid)).fetchone()
+        total = (cur[0] if cur else 0) + score
         conn.execute("INSERT OR REPLACE INTO user_scores VALUES (?,?,?)",
-                     (uid,cid,total))
+                     (uid, cid, total))
         conn.commit()
+
     await send_backup(context)
 
-    msg=("تبریک" if score>=0 else "شرم بر تو!") \
-        + f"\n{score:+} امتیاز\nجمع کل: {total}"
-    await update.message.reply_text(msg,reply_to_message_id=update.message.id)
+    if score >= 0:
+        msg = f"درود بر شما ✌️ {score}+ امتیاز انقلابی گرفتین 🕊️\nجمع کل: {total}"
+    else:
+        msg = f"شرم بر تو! {score} امتیاز از دست دادی!\nالان: {total}"
+    await update.message.reply_text(msg,
+                                    reply_to_message_id=update.message.message_id)
 
 async def my_state(update,context):
     uid=update.effective_user.id
