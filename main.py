@@ -124,20 +124,24 @@ ADD_TEXT,ADD_SCORE,DEL_TEXT=range(3)
 async def start(update:Update,context):
     if not is_admin(update):
         return
-    await update.message.reply_text("پنل مدیریت:",reply_markup=ADMIN_KB)
+    await update.message.reply_text("پنل میدیریت V_2.1:",reply_markup=ADMIN_KB)
 
 async def add_start(update,context):
     if not is_admin(update): return
-    await update.message.reply_text("متن شعار؟ یا لغو")
+    await update.message.reply_text("محتوای شعار را بفرست یا لغو",
+                                    reply_markup=ReplyKeyboardMarkup([["لغو"]], resize_keyboard=True))
     return ADD_TEXT
 
 async def add_text(update,context):
     if update.message.text=="لغو": return ConversationHandler.END
     context.user_data["txt"]=update.message.text
-    await update.message.reply_text("امتیاز؟")
+    await update.message.reply_text("امتیاز شعار را بفرست:",
+                                        await update.message.reply_text("امتیاز شعار را بفرست:"))
     return ADD_SCORE
 
 async def add_score(update,context):
+    if update.message.text == "لغو":
+        return await cancel(update, context)
     try: score=parse_int(update.message.text)
     except:
         await update.message.reply_text("عدد نامعتبر")
@@ -152,7 +156,8 @@ async def add_score(update,context):
 
 async def del_start(update,context):
     if not is_admin(update): return
-    await update.message.reply_text("متن شعار جهت حذف؟")
+    await update.message.reply_text("متن شعار برای حذف:",
+                                    reply_markup=ReplyKeyboardMarkup([["لغو"]], resize_keyboard=True))
     return DEL_TEXT
 
 async def del_text(update,context):
