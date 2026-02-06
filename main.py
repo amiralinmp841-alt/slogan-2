@@ -70,6 +70,22 @@ def mention_html(uid,name):
     safe=name.replace("<","").replace(">","")
     return f'<a href="tg://user?id={uid}">{safe}</a>'
 
+import re
+
+def normalize_text(text: str):
+    text = text.lower()
+    text = text.replace("ي","ی").replace("ك","ک")
+    words = re.findall(r'\w+', text)
+    return words
+
+def slogan_match(message_words, slogan_words):
+    i = 0
+    for mw in message_words:
+        if slogan_words[i] in mw:
+            i += 1
+            if i == len(slogan_words):
+                return True
+    return False
 # ================= BACKUP =================
 def export_db():
     data={"slogans":[],"user_scores":[]}
@@ -178,31 +194,58 @@ async def list_slogans(update,context):
 
 # ================= GROUP =================
 async def slogan_listener(update: Update, context):
-    text = update.message.text
+    msg_text = update.message.text
+    message_words = normalize_text(msg_text)
+
+    matched_score = 0
+
     with sqlite3.connect(DB_PATH) as conn:
-        row = conn.execute("SELECT score FROM slogans WHERE text=?",
-                           (text,)).fetchone()
-        if not row:
+        slogans = conn.execute(
+            "SELECT text, score FROM slogans"
+        ).fetchall()
+
+        for text, score in slogans:
+            slogan_words = normalize_text(text)
+
+            if slogan_match(message_words, slogan_words):
+                matched_score += score
+
+        if matched_score == 0:
             return
-        score = row[0]
+
         uid = update.effective_user.id
         cid = update.effective_chat.id
+
         cur = conn.execute(
             "SELECT score FROM user_scores WHERE user_id=? AND chat_id=?",
-            (uid, cid)).fetchone()
-        total = (cur[0] if cur else 0) + score
-        conn.execute("INSERT OR REPLACE INTO user_scores VALUES (?,?,?)",
-                     (uid, cid, total))
+            (uid, cid)
+        ).fetchone()
+
+        total = (cur[0] if cur else 0) + matched_score
+
+        conn.execute(
+            "INSERT OR REPLACE INTO user_scores VALUES (?,?,?)",
+            (uid, cid, total)
+        )
         conn.commit()
 
     await send_backup(context)
 
-    if score >= 0:
-        msg = f"درود بر شما ✌️ {score}+ امتیاز انقلابی گرفتین 🕊️\nجمع کل: {total}"
+    if matched_score > 0:
+        msg = (
+            f"درود بر شما ✌️ {matched_score:+} امتیاز انقلابی گرفتین 🕊️\n"
+            f"جمع کل: {total}"
+        )
     else:
-        msg = f"شرم بر تو! {score} امتیاز از دست دادی!\nالان: {total}"
-    await update.message.reply_text(msg,
-                                    reply_to_message_id=update.message.message_id)
+        msg = (
+            f"شرم بر تو! {matched_score} امتیاز از دست دادی!\n"
+            f"الان: {total}"
+        )
+
+    await update.message.reply_text(
+        msg,
+        reply_to_message_id=update.message.message_id
+    )
 
 async def my_state(update,context):
     uid=update.effective_user.id
